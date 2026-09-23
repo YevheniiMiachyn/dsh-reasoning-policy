@@ -1,0 +1,78 @@
+# --- dsh-akeno-reasoning-policy -------------------------------------------------
+# This repository carries plugin SOURCE only. No runtime, production or personal
+# data may be committed.
+
+node_modules/
+*.log
+*.tmp
+*.tmp-*
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Timestamped local backups (the project convention is
+# `<file>.bak-YYYYMMDD-HHMMSS-before-<reason>`); they are production state, not source.
+*.bak
+*.bak-*
+*.before-*
+*.orig
+*.rej
+
+# Release artifacts and coverage output
+*.tgz
+*.tar.gz
+coverage/
+dist/
+
+# --- Secrets and credentials -----------------------------------------------------
+.env
+.env.*
+.credentials.yaml
+*credentials*.yaml
+settings.yaml
+settings-no-tts.yaml
+scratch-settings.yaml
+*.pem
+*.key
+*.p12
+*.pfx
+
+# --- Model weights and audio -----------------------------------------------------
+*.gguf
+*.ggml
+*.safetensors
+*.onnx
+*.bin
+*.pt
+*.ckpt
+*.wav
+*.mp3
+*.ogg
+*.flac
+voices/
+
+# --- Captured runtime data: prompts, wire bodies, sessions, memory ---------------
+# Wire captures contain real prompt text; session logs and the memory store contain
+# private conversation. None of it belongs here.
+wire/
+*.jsonl
+*.jsonl.zstd
+*.zstd
+sessions/
+memories/
+memory_summary.md
+raw_memories.md
+rollout_summaries/
+journal.jsonl
+diagnostics.json
+state.json
+lastsubmit.json
+pre-p*.json
+presnap-*.json
+proxy.log.jsonl
+bench-results.txt
+
+# --- Browser profiles captured during voice/e2e validation ----------------------
+browser-profiles/
+chrome-probe/
+.playwright-mcp/
