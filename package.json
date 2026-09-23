@@ -1,8 +1,8 @@
 {
-  "name": "dsh-akeno-reasoning-policy",
+  "name": "dsh-reasoning-policy",
   "version": "0.1.0-local.1",
   "private": true,
-  "description": "DSH agent/request hook: choose the local Akeno reasoning effort per request so ordinary turns answer immediately while explicit deep-reasoning requests keep their reasoning. Uses only the off<->medium pair, which share a prompt prefix on Qwen3.8 and therefore do not invalidate the KV cache.",
+  "description": "DSH agent/request hook: choose the local reasoning effort per request so ordinary turns answer immediately while explicit deep-reasoning requests keep their reasoning. Uses only the off<->medium pair, which share a prompt prefix on Qwen3.8 and therefore do not invalidate the KV cache.",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
@@ -32,11 +32,11 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/YevheniiMiachyn/dsh-akeno-reasoning-policy.git"
+    "url": "git+https://github.com/YevheniiMiachyn/dsh-reasoning-policy.git"
   },
-  "homepage": "https://github.com/YevheniiMiachyn/dsh-akeno-reasoning-policy",
+  "homepage": "https://github.com/YevheniiMiachyn/dsh-reasoning-policy",
   "bugs": {
-    "url": "https://github.com/YevheniiMiachyn/dsh-akeno-reasoning-policy/issues"
+    "url": "https://github.com/YevheniiMiachyn/dsh-reasoning-policy/issues"
   },
   "license": "MIT",
   "peerDependencies": {

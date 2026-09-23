@@ -1,6 +1,6 @@
 # Release notes — v0.1.0-local.1
 
-**Package:** `dsh-akeno-reasoning-policy`
+**Package:** `dsh-reasoning-policy`
 **Date:** 2026-09-23
 **Status:** production-validated on a local deployment.
 
@@ -26,7 +26,7 @@
   session still carrying an older effort keeps behaving as before.
 * **Cloud-safety fence.** Only requests whose `provider` matches the configured
   value are re-priced; every other provider passes through byte for byte.
-* **Opt-in debug logging** (`debug: true` or `DSH_AKENO_REASONING_DEBUG=1`), one
+* **Opt-in debug logging** (`debug: true` or `DSH_REASONING_POLICY_DEBUG=1`), one
   line per request, no prompt content.
 * **Tests** — 18 tests, no devDependencies, `npm test`.
 

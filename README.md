@@ -113,8 +113,8 @@ from a DSH profile's Cordis patch file. A generic example:
 {
   insert: [
     {
-      id: akeno-reasoning-policy,
-      name: "<path-to>/dsh-akeno-reasoning-policy/lib/index.js",
+      id: reasoning-policy,
+      name: "<path-to>/dsh-reasoning-policy/lib/index.js",
       config: {
         provider: unsloth,
         defaultEffort: medium,
@@ -173,12 +173,12 @@ All four keys are optional; the shipped defaults are shown.
 | `defaultEffort` | `medium` | the effort a request seeds when nobody has chosen. Must equal the session default in the settings document, or the policy has nothing to compare a seed against and declines to act. This is also the **normal** tier. |
 | `fastEffort` | `off` | the **fast** tier. Must be a level that shares the normal tier's prompt prefix. |
 | `deepEffort` | `xhigh` | the **deep** tier. Reached only when the user asks for reasoning itself. |
-| `debug` | `false` | emit one log line per request. Also enabled by `DSH_AKENO_REASONING_DEBUG=1`. No prompt content is logged. |
+| `debug` | `false` | emit one log line per request. Also enabled by `DSH_REASONING_POLICY_DEBUG=1`. No prompt content is logged. |
 
 Debug output looks like:
 
 ```
-AKENO REASONING turn=1 step=1 policy=fast reason=simple-default class=simple wireThinking=off
+DSH REASONING turn=1 step=1 policy=fast reason=simple-default class=simple wireThinking=off
 ```
 
 Note that `defaultEffort` doubles as the normal tier, so changing it changes both

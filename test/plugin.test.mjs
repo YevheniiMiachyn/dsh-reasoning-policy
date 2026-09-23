@@ -45,7 +45,7 @@ function request(handlers, agent, effort, turn = 1, step = 1) {
 }
 
 test('exports a mountable Cordis plugin', () => {
-  assert.equal(name, 'akeno-reasoning-policy')
+  assert.equal(name, 'reasoning-policy')
   assert.deepEqual(inject, [])
 })
 

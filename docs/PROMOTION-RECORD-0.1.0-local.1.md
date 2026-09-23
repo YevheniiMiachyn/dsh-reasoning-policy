@@ -1,4 +1,4 @@
-# Promotion record — dsh-akeno-reasoning-policy 0.1.0-local.1
+# Promotion record — dsh-reasoning-policy 0.1.0-local.1
 
 **Stage:** reasoning-policy
 **Date:** 2026-09-23
@@ -25,7 +25,7 @@ Two configuration files and one new local package. Nothing else.
 |---|---|
 | production profile settings document | `agent-default-model.reasoningEffort` `low` → `medium`; the model's `reasoningEfforts` map gained `off: none` |
 | production profile Cordis patch (`<DSH_HOME>/profiles/web/cordis.patch.yml`) | mounts the new plugin by absolute path |
-| `<local-packages>/dsh-akeno-reasoning-policy/` | new local package (no registry install, no `node_modules` patch) |
+| `<local-packages>/dsh-reasoning-policy/` | new local package (no registry install, no `node_modules` patch) |
 
 Verified by diff against pre-stage backups: the only value changes are those two,
 and the `memory` and `dsh-tts` configuration blocks are **byte-identical** to the
@@ -42,8 +42,8 @@ Promoted artifact sizes (source files, unchanged by release housekeeping):
 | `test/policy.test.mjs` | 6374 |
 | `test/plugin.test.mjs` | 4881 |
 
-Package version: `dsh-akeno-reasoning-policy@0.1.0-local.1`.
-Plugin id `akeno-reasoning-policy`, mounted as `provider: unsloth`,
+Package version: `dsh-reasoning-policy@0.1.0-local.1`.
+Plugin id `reasoning-policy`, mounted as `provider: unsloth`,
 `defaultEffort: medium`, `fastEffort: off`, `deepEffort: xhigh`, `debug: false`.
 
 Two file hashes are the ones that matter for rollback, because they are the two
@@ -94,7 +94,7 @@ Copy-Item <settings-document>.bak-<timestamp>-before-reasoning-policy `
           <settings-document> -Force
 ```
 
-**Full removal:** also delete the `akeno-reasoning-policy` row from the profile's
+**Full removal:** also delete the `reasoning-policy` row from the profile's
 `cordis.patch.yml` (a timestamped backup was taken first) and restart DSH. The
 package directory can be left in place; nothing else references it.
 
