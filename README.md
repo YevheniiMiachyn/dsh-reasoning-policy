@@ -1,4 +1,4 @@
-# dsh-akeno-reasoning-policy
+# dsh-reasoning-policy
 
 A **request-scoped adaptive reasoning policy** for DeepSeek Harness (DSH) agent
 turns on a **local** OpenAI-compatible reasoning model.
