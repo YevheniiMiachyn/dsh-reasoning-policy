@@ -1,6 +1,6 @@
 {
   "name": "dsh-reasoning-policy",
-  "version": "0.1.0-local.1",
+  "version": "0.2.0-local.1",
   "private": true,
   "description": "DSH agent/request hook: choose the local reasoning effort per request so ordinary turns answer immediately while explicit deep-reasoning requests keep their reasoning. Uses only the off<->medium pair, which share a prompt prefix on Qwen3.8 and therefore do not invalidate the KV cache.",
   "type": "module",
