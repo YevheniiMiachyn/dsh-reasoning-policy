@@ -15,8 +15,10 @@ import { apply, name, inject } from '../lib/index.js'
 /** Build a fake ctx and return its registered listeners. */
 function harness(config = {}) {
   const handlers = new Map()
-  const ctx = { on: (event, fn) => { handlers.set(event, fn) }, logger: { info: () => {} } }
-  apply(ctx, { provider: 'unsloth', defaultEffort: 'medium', debug: false, ...config })
+  const lines = []
+  const ctx = { on: (event, fn) => { handlers.set(event, fn) }, logger: { info: (line) => { lines.push(line) } } }
+  apply(ctx, { provider: 'unsloth', debug: true, ...config })
+  handlers.lines = lines
   return handlers
 }
 
@@ -49,45 +51,73 @@ test('exports a mountable Cordis plugin', () => {
   assert.deepEqual(inject, [])
 })
 
-test('all three tiers are reachable turn by turn, though each turn seeds the next', async () => {
+test('auto reaches all three tiers turn by turn, and DSH re-offers auto every turn', async () => {
   const handlers = harness()
   const agent = {}
 
-  // 1. Greeting -> fast tier.
+  // DSH's model selection applies the picker's level to every request, so each turn is offered `auto` again.
   await say(handlers, agent, 'Hi.')
-  const fast = await request(handlers, agent, 'medium')
-  assert.equal(fast.reasoningEffort, 'off', 'a greeting must not think')
+  assert.equal((await request(handlers, agent, 'auto')).reasoningEffort, 'off', 'a greeting must not think')
 
-  // 2. A reasoning-shaped task, seeded by our own `off` -> normal tier.
-  //    Normal shares the fast prompt prefix, so this switch is effectively free.
   await say(handlers, agent, 'Debug this race condition.')
-  const task = await request(handlers, agent, fast.reasoningEffort)
-  assert.equal(task.reasoningEffort, 'medium', 'a reasoning-shaped task must think')
+  assert.equal((await request(handlers, agent, 'auto')).reasoningEffort, 'medium', 'a reasoning-shaped task must think')
 
-  // 3. An explicit request for reasoning, seeded by our own `medium` -> deep tier.
   await say(handlers, agent, 'Think carefully about this race condition.')
-  const deep = await request(handlers, agent, task.reasoningEffort)
-  assert.equal(deep.reasoningEffort, 'xhigh', 'an explicit reasoning request must escalate')
+  assert.equal((await request(handlers, agent, 'auto')).reasoningEffort, 'xhigh', 'an explicit reasoning request must escalate')
 
-  // 4. ...and a following simple turn comes back down.
   await say(handlers, agent, "What's my PC GPU?")
-  const again = await request(handlers, agent, deep.reasoningEffort)
-  assert.equal(again.reasoningEffort, 'off')
+  assert.equal((await request(handlers, agent, 'auto')).reasoningEffort, 'off')
 })
 
 test('a long task message keeps ordinary thinking rather than the fast path', async () => {
   const handlers = harness()
   const agent = {}
   await say(handlers, agent, 'y'.repeat(600))
-  assert.equal((await request(handlers, agent, 'medium')).reasoningEffort, 'medium')
+  assert.equal((await request(handlers, agent, 'auto')).reasoningEffort, 'medium')
 })
 
-test('an untouched seed equal to the default is classified, a foreign one is not', async () => {
+test('every selected level survives every kind of turn untouched', async () => {
+  const handlers = harness()
+  const turns = ['Hi.', "What's my PC GPU?", 'Debug this race condition.', 'Think carefully about this.']
+  for (const level of ['off', 'low', 'medium', 'high', 'xhigh']) {
+    const agent = {}
+    for (const text of turns) {
+      await say(handlers, agent, text)
+      const resolved = await request(handlers, agent, level)
+      assert.equal(resolved.reasoningEffort, level, `${level} was rewritten for ${JSON.stringify(text)}`)
+    }
+  }
+})
+
+test('a profile default of low is a selection, and is respected rather than treated as inert or as adaptive', async () => {
   const handlers = harness()
   const agent = {}
   await say(handlers, agent, 'Hi.')
-  // `low` is a level this policy never writes, so it must be left alone.
-  assert.equal((await request(handlers, agent, 'low')).reasoningEffort, 'low')
+  const resolved = await request(handlers, agent, 'low')
+  assert.equal(resolved.reasoningEffort, 'low')
+  assert.ok(handlers.lines.some((line) => line.includes('reason=explicit-respected')), 'the log must say the level was respected')
+})
+
+test('the policy has no memory: a restart cannot change what a selection means', async () => {
+  const first = harness()
+  const agent = {}
+  await say(first, agent, 'Hi.')
+  assert.equal((await request(first, agent, 'auto')).reasoningEffort, 'off')
+  // A fresh plugin instance (a restart) offered the persisted `off` treats it as the selection it is.
+  const second = harness()
+  await say(second, agent, 'Think carefully about this.')
+  assert.equal((await request(second, agent, 'off')).reasoningEffort, 'off')
+  assert.equal((await request(second, agent, 'auto')).reasoningEffort, 'xhigh')
+})
+
+test('the saved preference is never written: the policy only returns a config', async () => {
+  const handlers = harness()
+  const agent = {}
+  await say(handlers, agent, 'Hi.')
+  const offered = Object.freeze({ provider: 'unsloth', model: 'm', reasoningEffort: 'auto' })
+  const resolved = await handlers.get('agent/request').call({}, { agent, turn: 1, step: 1 }, () => Promise.resolve(offered))
+  assert.equal(offered.reasoningEffort, 'auto', 'the offered config object must not be mutated')
+  assert.equal(resolved.reasoningEffort, 'off')
 })
 
 test('a cloud provider is passed through untouched', async () => {
@@ -97,15 +127,21 @@ test('a cloud provider is passed through untouched', async () => {
   const resolved = await handlers.get('agent/request').call({}, { agent, turn: 1, step: 1 }, () => Promise.resolve({
     provider: 'deepseek-official',
     model: 'deepseek-flash',
-    reasoningEffort: 'high',
+    reasoningEffort: 'auto',
   }))
   assert.equal(resolved.provider, 'deepseek-official')
-  assert.equal(resolved.reasoningEffort, 'high', 'the policy must never re-price a cloud route')
+  assert.equal(resolved.reasoningEffort, 'auto', 'the policy must never re-price a cloud route')
 })
 
-test('a request with no classified turn is left exactly as seeded', async () => {
+test('auto with no classified turn asks for ordinary thinking, never a guessed tier', async () => {
   const handlers = harness()
-  assert.equal((await request(handlers, {}, 'medium')).reasoningEffort, 'medium')
+  assert.equal((await request(handlers, {}, 'auto')).reasoningEffort, 'medium')
+})
+
+test('a selected level with no classified turn is left exactly as seeded', async () => {
+  const handlers = harness()
+  assert.equal((await request(handlers, {}, 'low')).reasoningEffort, 'low')
+  assert.equal((await request(handlers, {}, undefined)).reasoningEffort, undefined)
 })
 
 test('other config keys on the resolved config survive the rewrite', async () => {
@@ -113,8 +149,15 @@ test('other config keys on the resolved config survive the rewrite', async () =>
   const agent = {}
   await say(handlers, agent, 'Hi.')
   const resolved = await handlers.get('agent/request').call({}, { agent, turn: 1, step: 1 },
-    seed('medium', { maxTokens: 16384, temperature: 0.7 }))
+    seed('auto', { maxTokens: 16384, temperature: 0.7 }))
   assert.equal(resolved.maxTokens, 16384)
   assert.equal(resolved.temperature, 0.7)
   assert.equal(resolved.reasoningEffort, 'off')
+})
+
+test('the legacy defaultEffort key still names the normal tier', async () => {
+  const handlers = harness({ defaultEffort: 'medium' })
+  const agent = {}
+  await say(handlers, agent, 'Debug this race condition.')
+  assert.equal((await request(handlers, agent, 'auto')).reasoningEffort, 'medium')
 })

@@ -63,10 +63,13 @@ the everyday escalation from a greeting to a task costs nothing.
   `LlmCallConfig` changes, and only its `reasoningEffort` key.
 * **Local-model focused.** Only `config.provider` routes are touched. Any other
   provider — including a cloud route — is returned untouched, byte for byte.
-* **A user's explicit reasoning choice is respected.** The policy only ever
-  rewrites a seed equal to the configured default. Anything else can only have
-  come from an explicit per-session or composer selection, so it is returned
-  as-is.
+* **A selected reasoning level is always respected.** The policy only ever
+  rewrites the dedicated `auto` level. Off, Low, Medium, High and anything else
+  somebody selected is returned as-is, whatever the turn says and whether or not
+  the reply will be spoken. The policy compares no values with a "default": it
+  does not try to guess whether a level was chosen, because a profile default, a
+  composer pick and its own earlier output can all be the same string. Choosing
+  `auto` is how adaptive reasoning is asked for.
 * **No cloud routing.** The plugin cannot introduce a provider; it only picks an
   effort on a provider that was already chosen.
 * **Tool-compatible.** Thinking off did not damage tool dispatch: 4/4 replay runs
@@ -117,7 +120,8 @@ from a DSH profile's Cordis patch file. A generic example:
       name: "<path-to>/dsh-reasoning-policy/lib/index.js",
       config: {
         provider: unsloth,
-        defaultEffort: medium,
+        autoEffort: auto,
+        normalEffort: medium,
         fastEffort: off,
         deepEffort: xhigh,
         debug: false
@@ -136,17 +140,17 @@ document for that provider:
 
 ```yaml
           reasoningEfforts:
+            auto: medium   # adaptive — the policy picks fast, normal or deep per turn;
+                           # its wire value is only the fallback when the plugin is not loaded
             off: none      # fast   — wire "none", shares the medium prefix
-            medium: medium # normal — recommended session default
+            medium: medium # normal
             xhigh: xhigh   # deep
 ```
 
-and set the agent default effort to the **normal** tier:
-
-```yaml
-    agent-default-model:
-      reasoningEffort: medium
-```
+Every other level in that map (low, high, ...) is a plain selection and is sent exactly as
+chosen. Nothing about the saved agent default needs to change: leave
+`agent-default-model.reasoningEffort` at whatever it is, or set it to `auto` if adaptive
+reasoning should be the default.
 
 Restart DSH after changing either file. Node caches ES modules, so plugin source
 edits and patch rewrites are **not** picked up without a restart.
@@ -170,7 +174,8 @@ All four keys are optional; the shipped defaults are shown.
 | key | default | meaning |
 |---|---|---|
 | `provider` | `unsloth` | only `LlmCallConfig`s whose `provider` equals this are re-priced. Everything else passes through untouched, which is the cloud-safety fence. |
-| `defaultEffort` | `medium` | the effort a request seeds when nobody has chosen. Must equal the session default in the settings document, or the policy has nothing to compare a seed against and declines to act. This is also the **normal** tier. |
+| `autoEffort` | `auto` | the level name that asks for adaptive reasoning. Only a request offered exactly this level is classified; every other level is respected untouched. |
+| `normalEffort` | `medium` | the **normal** tier. The pre-0.2 key `defaultEffort` is still read as an alias for it, but no longer decides what counts as a user's choice. |
 | `fastEffort` | `off` | the **fast** tier. Must be a level that shares the normal tier's prompt prefix. |
 | `deepEffort` | `xhigh` | the **deep** tier. Reached only when the user asks for reasoning itself. |
 | `debug` | `false` | emit one log line per request. Also enabled by `DSH_REASONING_POLICY_DEBUG=1`. No prompt content is logged. |
@@ -181,11 +186,9 @@ Debug output looks like:
 DSH REASONING turn=1 step=1 policy=fast reason=simple-default class=simple wireThinking=off
 ```
 
-Note that `defaultEffort` doubles as the normal tier, so changing it changes both
-the seed comparison and the tier mapping. If your template's prefix families
-differ from the measured one, the safest re-tune is to set `fastEffort` and
-`defaultEffort` to two levels that share a prefix on your model, and leave
-`deepEffort` as the expensive opt-in.
+If your template's prefix families differ from the measured one, the safest
+re-tune is to set `fastEffort` and `normalEffort` to two levels that share a
+prefix on your model, and leave `deepEffort` as the expensive opt-in.
 
 ### User override
 

@@ -3,8 +3,9 @@
  *
  *   node --test test/policy.test.mjs
  *
- * These pin the two properties the stage depends on: an explicit user selection
- * is never rewritten, and only genuinely reasoning-shaped turns escalate.
+ * These pin the properties the stage depends on: a level somebody selected is never
+ * rewritten (whatever it is called, and whether or not the reply will be spoken), only
+ * the `auto` level adapts, and only genuinely reasoning-shaped turns escalate.
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
@@ -13,6 +14,7 @@ import {
   classifyTurn,
   decideEffort,
   latestUserText,
+  EFFORT_AUTO,
   EFFORT_DEEP,
   EFFORT_FAST,
   EFFORT_NORMAL,
@@ -68,8 +70,12 @@ test('a reasoning-shaped task classifies task, not explicit', () => {
   }
 })
 
-test('the deep tier is reached only through levels config', () => {
-  const args = { seedEffort: EFFORT_NORMAL, defaultEffort: EFFORT_NORMAL, policyWrote: undefined }
+test('a long conversational message is a task, not chat', () => {
+  assert.equal(classifyTurn('x'.repeat(500)), 'task')
+})
+
+test('the deep tier is reached only through levels config, and only from auto', () => {
+  const args = { seedEffort: EFFORT_AUTO }
   assert.equal(decideEffort({ ...args, text: 'Think carefully about this.' }).effort, EFFORT_DEEP)
   // A task stays in the free-to-switch normal tier even when deep is configured.
   assert.equal(decideEffort({ ...args, text: 'Debug this race condition.' }).effort, EFFORT_NORMAL)
@@ -80,63 +86,46 @@ test('the deep tier is reached only through levels config', () => {
   )
 })
 
-test('a long conversational message is a task, not chat', () => {
-  assert.equal(classifyTurn('x'.repeat(500)), 'task')
+test('every selected level is respected, whatever the text says (never off for a spoken reply)', () => {
+  // The regression this guards: a default of `low` read as an explicit choice used to leave the policy
+  // inert, and a policy that classified `medium` could rewrite a user's Medium to Off. Now a selection is
+  // a selection: Off, Low, Medium and High come back exactly as they went in, for every kind of turn.
+  const turns = ['Hi.', "What's my PC GPU?", 'Debug this race condition.', 'Think carefully about this.', 'x'.repeat(500)]
+  for (const seedEffort of ['off', 'low', 'medium', 'high', 'xhigh']) {
+    for (const text of turns) {
+      const decided = decideEffort({ seedEffort, text })
+      assert.equal(decided.effort, seedEffort, `${seedEffort} was changed for ${JSON.stringify(text.slice(0, 20))}`)
+      assert.equal(decided.reason, 'explicit-respected')
+      assert.equal(decided.klass, null)
+    }
+  }
 })
 
-test('decideEffort never rewrites a selection it did not make', () => {
-  // Nothing written yet and a seed that is not the default: this can only be an
-  // explicit choice (also the post-restart case), so it is left alone.
-  assert.deepEqual(
-    decideEffort({ seedEffort: EFFORT_DEEP, defaultEffort: EFFORT_NORMAL, policyWrote: undefined, text: 'Hi.' }),
-    { effort: EFFORT_DEEP, reason: 'user-explicit', klass: null },
-  )
-  assert.deepEqual(
-    decideEffort({ seedEffort: EFFORT_FAST, defaultEffort: EFFORT_NORMAL, policyWrote: undefined, text: 'Think carefully about this.' }),
-    { effort: EFFORT_FAST, reason: 'user-explicit', klass: null },
-  )
-  // `low` is a level this policy never writes at all.
-  assert.equal(
-    decideEffort({ seedEffort: 'low', defaultEffort: EFFORT_NORMAL, policyWrote: EFFORT_FAST, text: 'Hi.' }).reason,
-    'user-explicit',
-  )
-})
-
-test('a seed this policy wrote is re-decided, not mistaken for the user', () => {
-  // Regression: turn 1 wrote `off`; turn 2 then SEEDS `off` from the session's
-  // own request header. That is our output, so a deep request must still
-  // escalate instead of being frozen at the fast level forever.
-  const decided = decideEffort({
-    seedEffort: EFFORT_FAST,
-    defaultEffort: EFFORT_NORMAL,
-    policyWrote: EFFORT_FAST,
-    text: 'Think carefully about this race condition.',
-  })
-  assert.equal(decided.effort, EFFORT_DEEP)
-  assert.equal(decided.reason, 'explicit-deep')
-  // ...and the next simple turn comes back down from the deep seed.
-  assert.equal(
-    decideEffort({ seedEffort: EFFORT_DEEP, defaultEffort: EFFORT_NORMAL, policyWrote: EFFORT_DEEP, text: 'Hi.' }).effort,
-    EFFORT_FAST,
-  )
-})
-
-test('decideEffort routes the default seed by classification', () => {
-  const base = { defaultEffort: EFFORT_NORMAL, policyWrote: undefined }
-  assert.equal(decideEffort({ ...base, seedEffort: EFFORT_NORMAL, text: 'Hi.' }).effort, EFFORT_FAST)
-  assert.equal(decideEffort({ ...base, seedEffort: EFFORT_NORMAL, text: 'x'.repeat(500) }).effort, EFFORT_NORMAL)
+test('auto routes by classification', () => {
+  const base = { seedEffort: EFFORT_AUTO }
+  assert.equal(decideEffort({ ...base, text: 'Hi.' }).effort, EFFORT_FAST)
+  assert.equal(decideEffort({ ...base, text: 'x'.repeat(500) }).effort, EFFORT_NORMAL)
   // A named reasoning task gets real thinking, but stays in the tier that shares
   // the fast prefix — only an explicit request for reasoning pays the switch.
-  assert.equal(decideEffort({ ...base, seedEffort: EFFORT_NORMAL, text: 'Debug this race condition.' }).effort, EFFORT_NORMAL)
-  assert.equal(decideEffort({ ...base, seedEffort: EFFORT_NORMAL, text: 'Think carefully about this.' }).effort, EFFORT_DEEP)
+  assert.equal(decideEffort({ ...base, text: 'Debug this race condition.' }).effort, EFFORT_NORMAL)
+  assert.equal(decideEffort({ ...base, text: 'Think carefully about this.' }).effort, EFFORT_DEEP)
 })
 
-test('decideEffort declines when it cannot tell explicit from default', () => {
-  const noDefault = decideEffort({ seedEffort: 'low', defaultEffort: undefined, policyWrote: undefined, text: 'Hi.' })
-  assert.equal(noDefault.effort, 'low')
-  assert.equal(noDefault.reason, 'seed-unknown')
+test('the auto level name is configuration, not code', () => {
+  assert.equal(decideEffort({ seedEffort: 'adaptive', autoEffort: 'adaptive', text: 'Hi.' }).effort, EFFORT_FAST)
+  // With a renamed marker the old name is just another selected level.
+  assert.equal(decideEffort({ seedEffort: 'auto', autoEffort: 'adaptive', text: 'Hi.' }).effort, 'auto')
+})
 
-  const noSeed = decideEffort({ seedEffort: undefined, defaultEffort: EFFORT_NORMAL, policyWrote: undefined, text: 'Think carefully.' })
+test('decideEffort declines when there is no seed', () => {
+  const noSeed = decideEffort({ seedEffort: undefined, text: 'Think carefully.' })
   assert.equal(noSeed.effort, undefined)
   assert.equal(noSeed.reason, 'seed-unknown')
+})
+
+test('the decision never depends on persisted history', () => {
+  // A seed that equals a tier this policy once wrote is just a selected level now: `off` stays `off`
+  // for a deep request, because only `auto` asks for adaptation.
+  assert.equal(decideEffort({ seedEffort: EFFORT_FAST, text: 'Think carefully about this.' }).effort, EFFORT_FAST)
+  assert.equal(decideEffort({ seedEffort: EFFORT_DEEP, text: 'Hi.' }).effort, EFFORT_DEEP)
 })
